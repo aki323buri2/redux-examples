@@ -1,0 +1,19 @@
+.selected .selector ul
+{
+	list-style: none; 
+	margin: 0;
+	padding: 0;
+}
+.selected .selector ul > li 
+{
+	cursor: pointer;
+}
+.selected .selector .is-active 
+{
+	border: 1px solid red;
+}
+
+.list .is-selected 
+{
+	border: 1px solid red;
+}
