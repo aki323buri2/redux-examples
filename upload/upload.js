@@ -1,22 +1,21 @@
 if (!window.Promise) window.Promise = require('pinkie-promise');
 const ie10 = window.navigator.userAgent.match(/ie\s10/i);
 let debug = false;
-// debug = true;
+debug = true;//$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 Promise.resolve()
 .then(stat =>
 {
-	const { app, saga } = redux(App);
+	const app = redux(App);
 	render(app, document.querySelector('#app'));
-	saga.run(sagas);
+	app.run(saga);
 })
 .catch(err =>
 {
 	render(<div className="err">{err.toString()}</div>, document.querySelector('#err'));
-	console.error(err);
+	console.error(erro);
 });
 import React from 'react';
 import { render } from 'react-dom';
-import { findDOMNode } from 'react-dom';
 import { createStore, combineReducers, applyMiddleware } from 'redux';
 import { connect, Provider } from 'react-redux';
 import createSaga from 'redux-saga';
@@ -26,184 +25,158 @@ const redux = App =>
 	const saga = createSaga();
 	const middleware = [ saga, ...(!ie10 && debug ? [ logger ] : []) ];
 	const store = createStore(combineReducers(reducers), applyMiddleware(...middleware));
-	const app = (
-		<Provider store={store}>
-			{React.createElement(connect(state => state)(props => <App {...props}/>))}
-		</Provider>
-	);
-	return { app, saga };
-};
+	const app = <Provider store={store}><App/></Provider>;
+	return {
+		...app, 
+		run: root => saga.run(root), 
+	};
+}
 import { createActions } from 'redux-actions';
-import { handleActions } from 'redux-actions';
-import { put, takeEvery } from 'redux-saga/effects';
-import { eventChannel } from 'redux-saga';
-import numeral from 'numeral';
-import filesize from 'filesize';
-const reducers = (o => Object.entries(o).reduce((o, [ n, { map, initial } ]) =>
-	Object.assign(o, { [n]: handleActions(map, initial) })
-, {}))({
-	message : { map: { MESSAGE : (state, { payload: v }) => v }, initial: '' }, 
-	file    : { map: { FILE    : (state, { payload: v }) => v }, initial: null }, 
-	progress: { map: { PROGRESS: (state, { payload: { loaded, total } }) =>
-	{
-		return { loaded, total };
-
-	}}, initial: { loaded: 0, total: 0 }}, 
-
-	data: { map: { LOADEND: (state, { payload: v }) => v }, initial: null }, 
+const actions = createActions({
+	USER: a => a,
+	FILE: a => a,  
+	DATA: a => a, 
+	UPLOAD: a => a, 
 });
-const actions = createActions(...[
-	'MESSAGE', 
-	'FILE', 
-	'PARSE', 
-	'PROGRESS', 
-	'LOADEND', 
-	'UPLOAD', 
-]);
-const sagas = function *()
+import { handleActions } from 'redux-actions';
+const reducers = {};
+reducers.user = handleActions({ USER: (state, { payload: v }) => v }, '');
+reducers.file = handleActions({ FILE: (state, { payload: v }) => v }, null);
+reducers.data = handleActions({ FILE: (state, { payload: v }) => v }, null);
+import { put, call, takeEvery, takeLatest } from 'redux-saga/effects';
+import { eventChannel } from 'redux-saga';
+const saga = function *()
 {
-	yield put(actions.message('message'));
-
-	const reader = new FileReader();
-
-	yield takeEvery(actions.parse, function *({ payload: file })
-	{
-		yield reader.readAsArrayBuffer(file);
-	});
-	yield takeEvery(eventChannel(emit =>
-	{
-		reader.onerror     = e => console.log({ type: 'error', e });
-		reader.onprogress  = e =>
-		{
-			emit(actions.progress({ loaded: e.loaded, total: e.total }));
-		}
-		reader.onabort     = e => console.log({ type: 'abort', e });
-		reader.onloadstart = e => console.log({ type: 'loadstart', e });
-		reader.onload      = e => 
-		{
-			emit(actions.loadend(e.target.result));
-		};
-		return ()=>{};
-
-	}), function *(action)
-	{
-		yield put(action);
-	});
-	yield takeEvery(actions.upload, function *({ payload: data })
-	{
-		console.log(data);
-	});
+	yield put(actions.user('aki323buri2'));
 };
-const App = ({
-	dispatch, 
-	message, 
-	file, 
-	progress, 
-	data, 
-}) => (
+import { findDOMNode } from 'react-dom';
+import classnames from 'classnames';
+import filesize from 'filesize';
+const App = () => (
 	<div className="app">
-		
-		<div className="message-" style={{
-			position: 'fixed', 
-			zIndex: 100, 
-			left: 0, 
-			top: 0, 
-			width: 220, 
-		}}>
-			<article className="message">
-				<div className="message-body content is-small" style={{
-					padding: '.5em', 
-				}}>
-					{message}
-				</div>
-			</article>
-		</div>
-
-		<div style={{ display: ie10 ? '-ms-flexbox' : 'flex' }}>
-			<FileSelector
-				file={file}
-				change={v => dispatch(actions.file(v))}
-			/>
-
-			<div>&nbsp;</div>
-
-			{file === null ? null : 
-				<div className="file-info content is-small">
-					<a className="button is-small is-primary"
-						onClick={e => dispatch(actions.parse(file))}
-					>
-						<span className="icon is-small">
-							<i className="fa fa-list"></i>
-						</span>
-						<span>check</span>
-					</a>
-				</div>
-			}
-
-			
-		</div>
-
-		<div>&nbsp;</div>
-
-		<div className="progress- content is-small">
-		{progress.loaded === progress.total ? null : 
-			<progress className="progress is-small"
-				value={progress.loaded}
-				max={progress.total}
-			>
-			</progress>
-		}
-		{!progress.total || progress.total !== progress.loaded ? null : 
-			<span>{filesize(progress.total)}</span>
-		}
-		</div>
-
-		{!data ? null : 
-			<div className="upload">
-				<a className="button is-small is-danger"
-					onClick={e =>
-					{
-						dispatch(actions.upload(data));
-					}}
-				>
-					<span className="icon is-small">
-						<i className="fa fa-upload"></i>
-					</span>
-					<span>{filesize(data.byteLength)}</span>
-				</a>
-			</div>
-		}
-
+		<User/>
+		<File/>
+		<Upload/>
 	</div>
 );
-const FileSelector = ({
-	style, 
+const User = connect(state => state)(({
+	user, 
+}) => (
+	<div className="user tag is-small" style={{ margin: '.5em' }}>
+		<span className="icon is-small">
+			<i className="fa fa-user"></i>
+		</span>
+		<span className="name">
+			{user}
+		</span>
+	</div>
+));
+const File = connect(state => state, {
+	change: file => actions.file(file), 
+})(({
 	file, 
 	change, 
-}) => {
+}) => 
+{
 	let input;
 	return (
-	<div className="file-selector" style={style}>
-		<a className="button is-small"
+	<div className="file" style={{ marginBottom: '.5em' }}>
+		<input type="file" name="file" id="file" 
+			ref={r => input = r} 
+			style={{ display: 'none' }}
+			onChange={e => e.target.files.length ? change(e.target.files[0]) : null}
+		/>
+		<a className="button is-primary is-small has-icons-left"
 			onClick={e => input.click()}
 		>
 			<span className="icon is-small">
 				<i className="fa fa-folder"></i>
 			</span>
 			<span>
-				{file ? file.name : '...'}
+				{file ? file.name : ' ... '}
 			</span>
 		</a>
-
-		<input type="file" name="file" id="file"
-			ref={v => input = v}
-			onChange={e =>
-			{
-				if (!e.target.files.length) return;
-				change(e.target.files[0]);
-			}}
-			style={{ display: 'none' }}
-		/>
 	</div>
-	);
-};
+)});
+const Upload = connect(state => state, {
+	data: actions.data, 
+	upload: actions.upload, 
+})(
+class extends React.Component 
+{
+	constructor(props)
+	{
+		super(props);
+		this.reader = this.fileReader();
+		this.state = { loading: false, loaded: 0, total: 0 };
+	}
+	render = () =>
+	{
+		const {
+			file, 
+			upload, 
+		} = this.props;
+		const { 
+			loading, 
+			loaded, 
+			total, 
+		} = this.state;
+		const {
+			data
+		} = this;
+
+		return (
+		<div className="upload content is-small" style={{ margin: 0 }}>
+		{!file ? null : 
+			<div>
+				<a 
+					className={classnames({
+						'button is-info is-small has-icons-left': true, 
+						'is-loading': loading, 
+					})}
+					onClick={e => upload(data)}
+				>
+					<span className="icon is-small">
+						<i className="fa fa-upload"></i>
+					</span>
+					<span>Upload</span>
+				</a>
+				{'   '}
+				<span>
+					{loading ? 
+						`${loaded} / ${total}` 
+					:
+						`${filesize(loaded)} (${loaded})`
+					}
+				</span>
+
+			</div>
+		}
+		</div>
+		);
+	}
+	componentWillReceiveProps = ({ file }) =>
+	{
+		if (!file) return;
+		this.reader.readAsArrayBuffer(file);
+	}
+	fileReader = () =>
+	{
+		const reader = new FileReader();
+		reader.onloadstart = e =>
+		{
+			this.setState({ loading: true });
+		};
+		reader.onprogress = e => 
+		{
+			this.setState({ loaded: e.loaded, total: e.total });
+		};
+		reader.onloadend = e =>
+		{
+			this.setState({ loading: false });
+			this.data = e.target.result;
+		};
+		
+		return reader;
+	}
+});
