@@ -2,6 +2,10 @@ import React from 'react';
 import { findDOMNode } from 'react-dom';
 class Draggable extends React.Component 
 {
+	constructor(props)
+	{
+		super(props);
+	}
 	dom = () =>
 	{
 		return findDOMNode(this);
@@ -15,7 +19,7 @@ class Draggable extends React.Component
 		this.handle = dom.querySelector(this.props.handle || '.handle');
 		if (!this.handle) this.handle = dom;
 
-		this.handle.setAttribute('style', 'cursor: pointer');
+		// this.handle.setAttribute('style', 'cursor: pointer');
 		dom.addEventListener('mousedown' , this.mousedown , true);
 		dom.addEventListener('mouseup'   , this.mouseup   , true);
 		dom.addEventListener('touchstart', this.mousedown , { passive: false });
@@ -64,14 +68,21 @@ class Draggable extends React.Component
 	}
 	render = () =>
 	{
+		const { children } = this.props;
 		const { left, top } = this.state || {};
-		const style = {};
+
+		const { style } = this.props.style || { style: {} };
 		if (left !== undefined) style.left = left;
 		if (top  !== undefined) style.top  = top ;
-		style.color = 'red';
 		return (
-			React.cloneElement(React.Children.only(this.props.children), {
-				style: { ...this.props.children.props.style, ...style },  
+			React.cloneElement(React.Children.only(children), {
+				style: {
+					position: 'fixed', 
+					width: 200, 
+					background: 'red', 
+					right: 0, 
+					...style, 
+				}, 
 			})
 		);
 	}
