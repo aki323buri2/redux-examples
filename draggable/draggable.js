@@ -5,6 +5,14 @@ class Draggable extends React.Component
 	constructor(props)
 	{
 		super(props);
+		this.state = {
+			style: { 
+				position: 'fixed', 
+				zIndex: 100,
+
+				...this.props.style,  
+			}
+		};
 	}
 	dom = () =>
 	{
@@ -12,79 +20,60 @@ class Draggable extends React.Component
 	}
 	componentDidMount = () =>
 	{
-		const dom = this.dom();
-		const { left, top } = dom.getBoundingClientRect();
-		this.setState({ left, top });
-
-		this.handle = dom.querySelector(this.props.handle || '.handle');
-		if (!this.handle) this.handle = dom;
-
-		// this.handle.setAttribute('style', 'cursor: pointer');
-		dom.addEventListener('mousedown' , this.mousedown , true);
-		dom.addEventListener('mouseup'   , this.mouseup   , true);
-		dom.addEventListener('touchstart', this.mousedown , { passive: false });
-		dom.addEventListener('touchend'  , this.mouseup   , true);
+		this.handle = this.dom().querySelector('.handle')||this.dom();
+		this.handle.style.cursor = 'pointer';
+		this.dom().addEventListener('mousedown', this.mousedown, true);
+		this.dom().addEventListener('mouseup', this.mouseup, true);
 	}
 	componentWillUnmount = () =>
 	{
-		const dom = this.dom();
-		dom.removeEventListener('mousedown' , this.mousedown , true);
-		dom.removeEventListener('mouseup'   , this.mouseup   , true);
-		dom.removeEventListener('touchstart', this.touchstart, { passive: false });
-		dom.removeEventListener('touchend'  , this.touchend  , true);
+		this.dom().removeEventListener('mousedown', this.mousedown, true);
+		this.dom().removeEventListener('mouseup', this.mouseup, true);
 		document.removeEventListener('mousemove', this.mousemove, true);
-		document.removeEventListener('touchmove', this.mousemove, true);
 	}
-	mousedown  = e => 
+	mousedown = e =>
 	{
-		const { clientX: x, clientY: y } = e.type === 'touchstart' ? e.touches[0] : e;
-		const rect = this.handle.getBoundingClientRect();
-		const hittest = 
-			(r => r.left <= x && x <= r.right && r.top <= y && y <= r.bottom)(rect)
-		;
-		if (!hittest) return;
-
+		const { clientX: x, clientY: y } = e;
+		if (!(r => r.left <= x && x <= r.right && r.top <= y && y <= r.bottom)(this.handle.getBoundingClientRect()))
+		{
+			return;
+		}
 		e.preventDefault();
 		e.stopPropagation();
-		this.setState({ lastX: x, lastY : y });
+		this.last = { x, y };
+		const { left, top, right, bottom } = this
 		document.addEventListener('mousemove', this.mousemove, true);
-		document.addEventListener('touchmove', this.mousemove, true);
-	};
-	mouseup = e => 
+	}
+	mouseup = e =>
 	{
 		document.removeEventListener('mousemove', this.mousemove, true);
-		document.removeEventListener('touchmove', this.mousemove, true);
 	}
-	mousemove = e => 
+	mousemove = e =>
 	{
-		const { clientX: x, clientY: y } = e.type === 'touchmove' ? e.touches[0] : e;
-		const { left, top, lastX, lastY } = this.state;
-		this.setState({
-			left: left + (x - lastX), 
-			top : top  + (y - lastY), 
-			lastX: x, 
-			lastY: y, 
-		});
+		const { clientX: x, clientY: y } = e;
+		const delta = { x, y };
+		delta.x -= this.last.x;
+		delta.y -= this.last.y;
+		this.last = { x, y };
+		const { style } = this.state;
+		(s => 
+		{
+			if (s.right !== undefined) s.right -= delta.x;
+			if (s.bottom !== undefined) s.bottom -= delta.y;
+			let { left, top } = document.defaultView.getComputedStyle(this.dom());
+			left = parseInt(left.match(/(.+)px/)[1]);
+			top  = parseInt(top .match(/(.+)px/)[1]);
+			if (s.right === undefined) s.left = left + delta.x;
+			if (s.bottom === undefined) s.top = top + delta.y;
+		})(style);
+		this.setState({ style });
 	}
 	render = () =>
 	{
-		const { children } = this.props;
-		const { left, top } = this.state || {};
-
-		const { style } = this.props.style || { style: {} };
-		if (left !== undefined) style.left = left;
-		if (top  !== undefined) style.top  = top ;
-		return (
-			React.cloneElement(React.Children.only(children), {
-				style: {
-					position: 'fixed', 
-					width: 200, 
-					background: 'red', 
-					right: 0, 
-					...style, 
-				}, 
-			})
-		);
+		const { style } = this.state;
+		return (React.cloneElement(React.Children.only(this.props.children), {
+			style: { ...style }, 
+		}));
 	}
 }
 export default Draggable;
