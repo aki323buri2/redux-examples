@@ -5,13 +5,12 @@ class Draggable extends React.Component
 	constructor(props)
 	{
 		super(props);
-		this.state = {
-			style: { 
-				position: 'fixed', 
-				zIndex: 100,
-
-				...this.props.style,  
-			}
+		this.state = { 
+			style: {
+				position: 'absolute', 
+				zIndex: 100, 
+				...this.props.style, 
+			}, 
 		};
 	}
 	dom = () =>
@@ -20,7 +19,7 @@ class Draggable extends React.Component
 	}
 	componentDidMount = () =>
 	{
-		this.handle = this.dom().querySelector('.handle')||this.dom();
+		this.handle = this.dom().querySelector(this.props.handle||'.handle')||this.dom();
 		this.handle.style.cursor = 'pointer';
 		this.dom().addEventListener('mousedown', this.mousedown, true);
 		this.dom().addEventListener('mouseup', this.mouseup, true);
@@ -34,14 +33,14 @@ class Draggable extends React.Component
 	mousedown = e =>
 	{
 		const { clientX: x, clientY: y } = e;
-		if (!(r => r.left <= x && x <= r.right && r.top <= y && y <= r.bottom)(this.handle.getBoundingClientRect()))
+		const target = this.handle.getBoundingClientRect();
+		if (!(r => r.left <= x && x <= r.right && r.top <= y && y <= r.bottom)(target))
 		{
 			return;
 		}
 		e.preventDefault();
 		e.stopPropagation();
 		this.last = { x, y };
-		const { left, top, right, bottom } = this
 		document.addEventListener('mousemove', this.mousemove, true);
 	}
 	mouseup = e =>
@@ -55,25 +54,44 @@ class Draggable extends React.Component
 		delta.x -= this.last.x;
 		delta.y -= this.last.y;
 		this.last = { x, y };
+
 		const { style } = this.state;
-		(s => 
-		{
-			if (s.right !== undefined) s.right -= delta.x;
-			if (s.bottom !== undefined) s.bottom -= delta.y;
-			let { left, top } = document.defaultView.getComputedStyle(this.dom());
-			left = parseInt(left.match(/(.+)px/)[1]);
-			top  = parseInt(top .match(/(.+)px/)[1]);
-			if (s.right === undefined) s.left = left + delta.x;
-			if (s.bottom === undefined) s.top = top + delta.y;
-		})(style);
+		if (style.right  !== undefined) style.right -= delta.x; 
+		if (style.bottom !== undefined) style.bottom -= delta.y; 
+		const { left, top } = this.computedStyle();
+		if (style.right  === undefined) style.left = left + delta.x;
+		if (style.bottom === undefined) style.top  = top  + delta.y;
+
 		this.setState({ style });
 	}
+	computedStyle = () =>
+	{
+		let { left, top } = this.dom().getBoundingClientRect();
+
+		if (this.state.style.position !== 'absolute')
+		{
+			return { left, top };
+		}
+		
+		let el = this.dom();
+		while ((el = el.parentNode) && el.style.position !== 'static')
+		{
+			break;
+		}
+		const offset = el.getBoundingClientRect();
+		left -= offset.left;
+		top  -= offset.top ;
+		
+		return { left, top };		
+	}
+
 	render = () =>
 	{
-		const { style } = this.state;
+		const { style } = this.state; 
 		return (React.cloneElement(React.Children.only(this.props.children), {
-			style: { ...style }, 
+			style: { ...style }
 		}));
 	}
-}
+
+};
 export default Draggable;
