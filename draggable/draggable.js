@@ -1,15 +1,15 @@
 import React from 'react';
 import { findDOMNode } from 'react-dom';
-class Draggable extends React.Component 
+class Draggable extends React.Component
 {
 	constructor(props)
 	{
 		super(props);
-		this.state = { 
+		this.state = {
 			style: {
 				position: 'absolute', 
 				zIndex: 100, 
-				...this.props.style, 
+				...props.style, 
 			}, 
 		};
 	}
@@ -33,14 +33,13 @@ class Draggable extends React.Component
 	mousedown = e =>
 	{
 		const { clientX: x, clientY: y } = e;
-		const target = this.handle.getBoundingClientRect();
-		if (!(r => r.left <= x && x <= r.right && r.top <= y && y <= r.bottom)(target))
+		if (!(r=>r.left<=x&&x<=r.right&&r.top<=y&&y<=r.bottom)(this.handle.getBoundingClientRect()))
 		{
 			return;
 		}
 		e.preventDefault();
 		e.stopPropagation();
-		this.last = { x, y };
+		this.latest = { x, y };
 		document.addEventListener('mousemove', this.mousemove, true);
 	}
 	mouseup = e =>
@@ -51,47 +50,50 @@ class Draggable extends React.Component
 	{
 		const { clientX: x, clientY: y } = e;
 		const delta = { x, y };
-		delta.x -= this.last.x;
-		delta.y -= this.last.y;
-		this.last = { x, y };
+		delta.x -= this.latest.x;
+		delta.y -= this.latest.y;
+		this.latest = { x, y };
 
 		const { style } = this.state;
-		if (style.right  !== undefined) style.right -= delta.x; 
-		if (style.bottom !== undefined) style.bottom -= delta.y; 
-		const { left, top } = this.computedStyle();
+		if (style.right  !== undefined) style.right  -= delta.x;
+		if (style.bottom !== undefined) style.bottom -= delta.y;
+		let { left, top } = document.defaultView.getComputedStyle(this.dom());
+		if (left === 'auto' || top === 'auto')
+		{
+			({ left, top } = this.computedAutoStyle());
+		}
+		else
+		{
+			left = parseInt(left.replace(/px$/, ''));
+			top  = parseInt(top .replace(/px$/, ''));
+		}
 		if (style.right  === undefined) style.left = left + delta.x;
 		if (style.bottom === undefined) style.top  = top  + delta.y;
-
 		this.setState({ style });
 	}
-	computedStyle = () =>
+	computedAutoStyle = () =>
 	{
 		let { left, top } = this.dom().getBoundingClientRect();
-
-		if (this.state.style.position !== 'absolute')
+		if (document.defaultView.getComputedStyle(this.dom()).position !== 'absolute')
 		{
 			return { left, top };
 		}
-		
 		let el = this.dom();
-		while ((el = el.parentNode) && el.style.position !== 'static')
+		while (el = el.parentNode)
 		{
-			break;
+			if (document.defaultView.getComputedStyle(el).position !== 'static') break;
 		}
-		const offset = el.getBoundingClientRect();
+		const offset = el ? el.getBoundingClientRect() : { left: 0, top: 0 };
 		left -= offset.left;
 		top  -= offset.top ;
-		
-		return { left, top };		
+		return { left, top };
 	}
-
 	render = () =>
 	{
-		const { style } = this.state; 
+		const { style } = this.state;
 		return (React.cloneElement(React.Children.only(this.props.children), {
-			style: { ...style }
+			style: { ...style }, 
 		}));
 	}
-
 };
 export default Draggable;
