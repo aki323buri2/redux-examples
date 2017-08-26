@@ -2,6 +2,8 @@
 import React from 'react';
 import { findDOMNode } from 'react-dom';
 import classnames from 'classnames';
+import './sortable.scss';
+import _ from 'lodash';
 const env = {
 	ie: window.navigator.userAgent.match(/ie\s/i), 
 };
@@ -46,6 +48,7 @@ const Sortable = class extends React.Component
 		this.state = {
 			items: [ ...this.props.items ], 
 		};
+		this.selected = [];
 	}
 	dom = () => 
 	{
@@ -60,15 +63,29 @@ const Sortable = class extends React.Component
 		this.scroller = scroller(this.container);
 		dom(this.dom()).on(event.start, this.start, true);
 		dom(document).on(event.end, this.end, true);
+
+		dom(this.dom()).on('contextmenu', e => e.preventDefault());
 	}
+
 	componentWillUnmount = () =>
 	{
 		dom(this.dom()).off(event.start, this.start, true);
 		dom(document).off(event.end, this.end, true);
 		dom(document).off(event.move, this.move, true);
 	}
+	click = e => 
+	{
+		const node = dom(e.target).closest(node => node.sortable);
+		if (!_.find(this.selected, n => n === node))
+		{
+			this.selected.push(node);
+			node.classList.add('is-selected');
+		}
+	}
 	start = e => 
 	{
+		if (e.button === 2) return this.click(e);
+
 		this.nodes = dom(this.dom()).find(node => node.sortable);
 		this.node = dom(e.target).closest(node => node.sortable);
 		if (!this.node) return;
@@ -88,7 +105,6 @@ const Sortable = class extends React.Component
 		el.style.left     = `${this.node.rect.left}px`;
 		el.style.top      = `${this.node.rect.top}px`;
 		el.style.width    = `${this.node.rect.width}px`;
-		// el.style.height   = `${this.node.retc.height}px`;
 		el.classList.add('box', 'is-small');
 		this.moving = document.body.appendChild(el);
 		this.moving.appendChild(this.node.cloneNode(true));
@@ -100,8 +116,9 @@ const Sortable = class extends React.Component
 		el.style.left     = `${this.dom().rect.left}px`;
 		el.style.top      = `${this.node.rect.top}px`;
 		el.style.width    = `${this.dom().rect.width}px`;
-		el.style.opacity  = .5;
-		el.classList.add('box', 'is-small', 'button', 'is-info');
+		el.style.background = '#ccc';
+		el.style.opacity  = 0.5;
+		el.classList.add('box', 'is-small');
 		this.target = document.body.appendChild(el);
 		this.target.rect = this.target.getBoundingClientRect();
 		this.target.style[`${vendor}TransitionDuration`] = `${transition}ms`;
@@ -213,6 +230,7 @@ const Sortable = class extends React.Component
 			items.splice(this.index, 1);
 			items.splice(this.newIndex - (this.newIndex > this.index ? 1 : 0), 0, value);
 			this.setState({ items });
+			this.newIndex = null;
 		}
 	}
 
