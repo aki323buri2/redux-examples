@@ -1,32 +1,33 @@
+
 import React from 'react';
 import { findDOMNode } from 'react-dom';
 import classnames from 'classnames';
-const ie10 = window.navigator.userAgent.match(/ie\s10/i);
-const vendor = window.navigator.userAgent.match(/ie\s/i) ? 'ms' : 'webkit';
+const env = {
+	ie: window.navigator.userAgent.match(/ie\s/i), 
+};
+const vendor = env.ie ? 'ms' : 'webkit';
 const transition = 500;
 const event = {
 	start: [
 		'mousedown', 
 		'touchstart', 
-	], 
+	],
 	end: [
 		'mouseup', 
 		'touchend', 
 		'touchcancel', 
-	], 
+	],
 	move: [
 		'mousemove', 
 		'touchmove', 
-	], 
+	],
 };
-const arr = a => Array.isArray(a) ? a : [a];
-const rect = r => ({hittest:(x,y)=>r.left<=x&&x<=r.right&&r.top<=y&&y<=r.bottom});
 const dom = node => ({
 	on: (e, cb, b) => arr(e).map(e => node.addEventListener(e, cb, b)), 
 	off: (e, cb, b) => arr(e).map(e => node.removeEventListener(e, cb, b)), 
 	hittest: (x, y) => rect(node.getBoundingClientRect()).hittest(x, y), 
 	find: callback => [].filter.call(node.getElementsByTagName('*'), callback), 
-	closest: callback =>
+	closest: callback => 
 	{
 		for (let el = node; el; el = el.parentElement)
 		{
@@ -34,7 +35,10 @@ const dom = node => ({
 		}
 	}, 
 });
-const Sortable = class extends React.Component
+const arr = a => Array.isArray(a) ? a : [a];
+const rect = r => ({ hittest:(x,y)=>r.left<=x&&x<=r.right&&r.top<=y&&y<=r.bottom });
+
+const Sortable = class extends React.Component 
 {
 	constructor(props)
 	{
@@ -43,13 +47,17 @@ const Sortable = class extends React.Component
 			items: [ ...this.props.items ], 
 		};
 	}
-	dom = () =>
+	dom = () => 
 	{
 		return findDOMNode(this);
 	}
 	componentDidMount = () =>
 	{
-
+		this.container = env.ie 
+			? document.documentElement
+			: document.body
+		;
+		this.scroller = scroller(this.container);
 		dom(this.dom()).on(event.start, this.start, true);
 		dom(document).on(event.end, this.end, true);
 	}
@@ -59,167 +67,159 @@ const Sortable = class extends React.Component
 		dom(document).off(event.end, this.end, true);
 		dom(document).off(event.move, this.move, true);
 	}
-	start = e =>
+	start = e => 
 	{
-		e.preventDefault();
-
-		return e.button === 2 ? this.select(e) : this.moveStart(e);
-	}
-	moveStart = e =>
-	{
-
+		this.nodes = dom(this.dom()).find(node => node.sortable);
 		this.node = dom(e.target).closest(node => node.sortable);
 		if (!this.node) return;
 
-		this.nodes = dom(this.dom()).find(node => node.sortable);
-		if (!this.nodes) return;
+		e.preventDefault();
 
-		this.index = this.node.sortable.index;
-
-		const { left, top, width, height } = this.node.getBoundingClientRect();
-		const clone = this.node.cloneNode(true);
-		clone.style.left = `${left}px`;
-		clone.style.top = `${top}px`;
-		clone.style.width = `${width}px`;
-		clone.style.height = `${height}px`;
-		clone.style.position = 'fixed';
-		clone.style.zIndex = 100;
-		this.moving = document.body.appendChild(clone);
-
-		this.node.style.visibility = 'hidden';
+		const { index } = this.node.sortable;
+		this.index = index;
 
 		const { clientX: x, clientY: y } = e.touches ? e.touches[0] : e;
 		this.latest = { x, y };
 
+		let el = document.createElement('div');
+		this.node.rect = this.node.getBoundingClientRect();
+		el.style.position = 'fixed';
+		el.style.zIndex   = 100;
+		el.style.left     = `${this.node.rect.left}px`;
+		el.style.top      = `${this.node.rect.top}px`;
+		el.style.width    = `${this.node.rect.width}px`;
+		// el.style.height   = `${this.node.retc.height}px`;
+		el.classList.add('box', 'is-small');
+		this.moving = document.body.appendChild(el);
+		this.moving.appendChild(this.node.cloneNode(true));
+
+		this.dom().rect = this.dom().getBoundingClientRect();
+
+		el = document.createElement('div');
+		el.style.position = 'fixed';
+		el.style.left     = `${this.dom().rect.left}px`;
+		el.style.top      = `${this.node.rect.top}px`;
+		el.style.width    = `${this.dom().rect.width}px`;
+		el.style.opacity  = .5;
+		el.classList.add('box', 'is-small', 'button', 'is-info');
+		this.target = document.body.appendChild(el);
+		this.target.rect = this.target.getBoundingClientRect();
+		this.target.style[`${vendor}TransitionDuration`] = `${transition}ms`;
+
+
+		(a => a.map(node => node.rect = node.getBoundingClientRect()))([
+			this.node, 
+			this.moving, 
+		]);
+
 		dom(document).on(event.move, this.move, true);
 	}
-	move = e =>
+	move = e => 
 	{
 		const { clientX: x, clientY: y } = e.touches ? e.touches[0] : e;
 		const delta = { x, y };
 		delta.x -= this.latest.x;
 		delta.y -= this.latest.y;
+
+		const pos = y;
+		const min = 0;
+		const max = window.innerHeight;
+		const overflow = ((a,b,c)=>a>b?-(a-b):(b>c?(b-c):0))(min, pos, max);
+		const deccelator = 20;
+
+		this.scroller.stop();
+		if (overflow)
+		{
+			this.scroller.scroll(overflow / deccelator);
+		}
+
 		this.moving.style[`${vendor}Transform`] = `translate3d(
 			${delta.x}px,
 			${delta.y}px,
-			0)`;
+			0)`
+		;
 
-		const { left, top, width, height } = this.moving.getBoundingClientRect();
-		const position = top + height / 2;
-
-		const scroll = {};
-		scroll.container = ie10 ? document.documentElement : document.body;
-		scroll.min = 0;
-		scroll.max = window.innerHeight;
-		scroll.accelarator = 5;
-
-		scroll.overflow = ((a, b, c) => a > b ? -(a - b) : (b > c ? (b - c) : (0)))(
-			scroll.min, 
-			position, 
-			scroll.max, 
-		);
-
-		if (this.scrollInterval)
-		{
-			clearInterval(this.scrollInterval);
-			this.scrollInterval = null;
-		}
-		if (scroll.overflow)
-		{
-			this.scrollInterval = setInterval(() =>
-			{
-				scroll.container.scrollTop += scroll.overflow / height * scroll.accelarator
-				
-			}, 5);
-		}
+		this.node.style.visibility = 'hidden';
 
 		this.newIndex = null;
-		this.moving.rect = this.moving.getBoundingClientRect();
-		const interrupt = this.moving.rect.height;
 
-		this.nodes.every(node =>
+		this.moving.rect = this.moving.getBoundingClientRect();
+		
+		this.nodes.every((node, index) =>
 		{
-			const { value, index } = node.sortable;
-			let { top, height } = node.getBoundingClientRect();
 			
 			let translate = 0;
-			
+
 			if (index > this.index)
 			{
-				translate -= this.moving.rect.height;
-			}
-
-			top += translate;
-
-			if (top > this.moving.rect.top)
-			{
-				translate += interrupt;
-			}
-
-			top += translate;
-
-			if (index < this.index && top > this.moving.rect.top)
-			{
-				if (this.newIndex === null) this.newIndex = index;
-			}
-			else if (index > this.index && top + height < this.moving.rect.bottom)
-			{
-				this.newIndex = index;
+				translate -= this.node.rect.height;
 			}
 
 			node.style[`${vendor}Transform`] = `translate3d(0,${translate}px,0)`;
 			node.style[`${vendor}TransitionDuration`] = `${transition}ms`;
+			
+			node.rect = node.getBoundingClientRect();
+
+
+			if (node.rect.bottom < this.moving.rect.top)
+			{
+				this.newIndex = index + 1;
+			}
 
 			return true;
 		});
+		if (this.newIndex)
+		{
+			const before = this.nodes[this.newIndex - 1];
+			const after = this.nodes[this.newIndex];
+			const top = before === undefined ? 0 : before.rect.bottom;
+
+			const translate = top - this.target.rect.top;
+			this.target.style[`${vendor}Transform`] = `translate3d(0,${translate}px,0)`;
+		}
 	}
-	end = e =>
+	end = e => 
 	{
 		dom(document).off(event.move, this.move, true);
+		
+		this.scroller.stop();
+		
 		if (this.moving)
 		{
-			this.moving.parentElement.removeChild(this.moving);
+			document.body.removeChild(this.moving);
 			this.moving = null;
+		}
+		if (this.target)
+		{
+			document.body.removeChild(this.target);
+			this.target = null;
 		}
 		if (this.node)
 		{
 			this.node.style.visibility = '';
 			this.node = null;
 		}
-		if (this.scrollInterval)
+		(this.nodes||[]).every(node =>
 		{
-			clearInterval(this.scrollInterval);
-			this.scrollInterval = null;
-		}
-		if (this.nodes)
-		{
-			this.nodes.every(node =>
-			{
-				node.style[`${vendor}Transform`] = '';
-				node.style[`${vendor}TransitionDuration`] = '';
-				return true;
-			});
-			this.nodes = null;
-		}
+			node.style[`${vendor}Transform`] = '';
+			node.style[`${vendor}TransitionDuration`] = '';
+			return true;
+		});
 
-		if (this.index !== null && this.newIndex !== null)
+		if (this.newIndex)
 		{
-			let items = [ ...this.state.items ];
-			const move = items.splice(this.index, 1);
-			items.splice(this.newIndex, 0, move);
-			
+			const items = [ ...this.state.items ];
+			const value = items[this.index];
+			items.splice(this.index, 1);
+			items.splice(this.newIndex - (this.newIndex > this.index ? 1 : 0), 0, value);
 			this.setState({ items });
-			this.index = null;
-			this.newIndex = null;			
 		}
 	}
 
 	render = () =>
 	{
 		return (
-			<div className="sortable box is-small"
-				onContextMenu={e => e.preventDefault()}
-			>
+			<div className="sortable box is-small">
 			{this.state.items.map((value, index) =>
 				<SortableItem value={value} index={index} key={index}/>
 			)}
@@ -229,7 +229,7 @@ const Sortable = class extends React.Component
 };
 const SortableItem = class extends React.Component
 {
-	dom = () =>
+	dom = () => 
 	{
 		return findDOMNode(this);
 	}
@@ -248,4 +248,28 @@ const SortableItem = class extends React.Component
 		);
 	}
 };
+const scroller = container => new Scroller(container);
+class Scroller 
+{
+	constructor(container)
+	{
+		this.container = container;
+	}
+	scroll = (scroll) =>
+	{
+		this.stop();
+		this.interval = setInterval(() =>
+		{
+			this.container.scrollTop += scroll;
+		}, 5);
+	}
+	stop = () =>
+	{
+		if (this.interval)
+		{
+			clearInterval(this.interval);
+			this.interval = null;
+		}
+	}
+}
 export default Sortable;
