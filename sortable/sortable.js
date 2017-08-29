@@ -48,7 +48,6 @@ const Sortable = class extends React.Component
 		this.state = {
 			items: [ ...this.props.items ], 
 		};
-		this.selected = [];
 	}
 	dom = () => 
 	{
@@ -72,15 +71,6 @@ const Sortable = class extends React.Component
 		dom(this.dom()).off(event.start, this.start, true);
 		dom(document).off(event.end, this.end, true);
 		dom(document).off(event.move, this.move, true);
-	}
-	click = e => 
-	{
-		const node = dom(e.target).closest(node => node.sortable);
-		if (!_.find(this.selected, n => n === node))
-		{
-			this.selected.push(node);
-			node.classList.add('is-selected');
-		}
 	}
 	start = e => 
 	{
@@ -116,12 +106,27 @@ const Sortable = class extends React.Component
 		el.style.left     = `${this.dom().rect.left}px`;
 		el.style.top      = `${this.node.rect.top}px`;
 		el.style.width    = `${this.dom().rect.width}px`;
-		el.style.background = '#ccc';
+		el.style.background = '#FF3860';
 		el.style.opacity  = 0.5;
 		el.classList.add('box', 'is-small');
+		el.innerHTML = this.node.sortable.value;
 		this.target = document.body.appendChild(el);
 		this.target.rect = this.target.getBoundingClientRect();
 		this.target.style[`${vendor}TransitionDuration`] = `${transition}ms`;
+
+		const scrollContainer = env.ie ? document.documentElement : document.body;
+
+		el = document.createElement('div');
+		el.style.position = 'absolute';
+		el.style.left     = `${this.dom().rect.left}px`;
+		el.style.top      = `${scrollContainer.scrollTop + this.node.rect.top}px`;
+		el.style.width    = `${this.dom().rect.width}px`;
+		el.style.opacity = 0.5;
+		el.style.background = '#ccc';
+		el.classList.add('box', 'is-small');
+		el.innerHTML = this.node.sortable.value;
+		this.start = document.body.appendChild(el);
+		this.start.rect = this.start.getBoundingClientRect();
 
 
 		(a => a.map(node => node.rect = node.getBoundingClientRect()))([
@@ -203,12 +208,17 @@ const Sortable = class extends React.Component
 		
 		if (this.moving)
 		{
-			document.body.removeChild(this.moving);
+			this.moving.parentNode.removeChild(this.moving);
 			this.moving = null;
+		}
+		if (this.start)
+		{
+			this.start.parentNode.removeChild(this.start);
+			this.start = null;
 		}
 		if (this.target)
 		{
-			document.body.removeChild(this.target);
+			this.target.parentNode.removeChild(this.target);
 			this.target = null;
 		}
 		if (this.node)
@@ -237,7 +247,11 @@ const Sortable = class extends React.Component
 	render = () =>
 	{
 		return (
-			<div className="sortable box is-small">
+			<div className="sortable box is-small"
+				style={{
+					position: 'relative', 
+				}}
+			>
 			{this.state.items.map((value, index) =>
 				<SortableItem value={value} index={index} key={index}/>
 			)}
@@ -247,18 +261,19 @@ const Sortable = class extends React.Component
 };
 const SortableItem = class extends React.Component
 {
-	dom = () => 
-	{
-		return findDOMNode(this);
-	}
 	componentDidMount = () =>
 	{
+		this.dom = findDOMNode(this);
+		this.dom.style.cursor = 'pointer';
 		const { value, index } = this.props;
-		this.dom().sortable = { value, index };
-		this.dom().style.cursor = 'pointer';
+		if (this.dom) this.dom.sortable = { value, index };
+
 	}
 	render = () =>
 	{
+		const { value, index } = this.props;
+		if (this.dom) this.dom.sortable = { value, index };
+
 		return (
 			<div className="sortable-item box is-small">
 				{this.props.value}
