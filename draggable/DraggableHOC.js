@@ -25,8 +25,8 @@ const DraggableHOC = WrappedComponent => class extends React.Component
 		super(props);
 		this.state = {
 			style: {
-				...this.props.style, 
 				position: 'absolute', 
+				...this.props.style, 
 			}, 
 		};
 	}
